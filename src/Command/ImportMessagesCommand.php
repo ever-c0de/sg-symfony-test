@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Service\MessageService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -14,7 +15,6 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
-use Symfony\Component\HttpKernel\Log\Logger;
 
 #[AsCommand(
     name: 'app:import-messages',
@@ -23,7 +23,7 @@ use Symfony\Component\HttpKernel\Log\Logger;
 )]
 class ImportMessagesCommand extends Command
 {
-    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private Logger $logger)
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private LoggerInterface $logger)
     {
         parent::__construct();
     }
@@ -102,12 +102,15 @@ class ImportMessagesCommand extends Command
         // Generate result files with entities.
         $classes = $this->getAvailableEntityMessagesTypes();
         // Create a directory for results.
-        $this->fileSystem->mkdir(__DIR__ . '../../results');
+        if ($this->fileSystem->exists(__DIR__ . '../../../results') !== false) {
+            $this->fileSystem->mkdir(__DIR__ . '../../../results');
+        }
         foreach ($classes as $className) {
             $classEntities = $this->entityManager->getRepository($className)->findAll();
             if (!empty($classEntities)) {
                 try {
                     $json = json_encode($classEntities, JSON_THROW_ON_ERROR);
+                    $io->success(sprintf('Your entities is ready! JSON: %s.', (string) $json));
                 } catch (JsonException $e) {
                     $this->logger->error('Error while encoding {class} class entities.', [
                         'class' => $className,
@@ -124,7 +127,7 @@ class ImportMessagesCommand extends Command
 
         $this->logger->notice('Successfully imported {importedMessages} message(s). Duplicate(s): {duplicates}. Error(s): {errors}', [
             'command' => $this->getName(),
-            'importedMessages'=> count($decodedMessages) - count($duplicates) - count($errors),
+            'importedMessages' => count($decodedMessages) - count($duplicates) - count($errors),
             'duplicates' => count($duplicates),
             'errors' => count($errors),
             'resultFiles' => ['/first', '/second'],
@@ -151,7 +154,7 @@ class ImportMessagesCommand extends Command
     {
         $classNames = [];
         // Path to the folder where classes located.
-        $directoryPath = __DIR__ . '/Entity/Message';
+        $directoryPath = __DIR__ . '/../Entity/Message';
 
         // Using Symfony Finder to find classes.
         $finder = new Finder();
@@ -160,7 +163,7 @@ class ImportMessagesCommand extends Command
         foreach ($finder as $file) {
             // Get the class name from the file.
             if (!empty($name = $this->getClassNameFromFile($file))) {
-            $classNames[] = $name;
+                $classNames[] = $name;
             }
         }
 

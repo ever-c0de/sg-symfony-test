@@ -7,20 +7,20 @@ use App\Entity\Message\Review;
 use Doctrine\ORM\EntityManagerInterface;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumberUtil;
-use Symfony\Component\HttpKernel\Log\Logger;
+use Psr\Log\LoggerInterface;
 
 class MessageService
 {
     private const string DUPLICATE = 'duplicate';
     private const string ERROR = 'error';
     public const array REVIEW_STATUS = [
-        'new',
-        'scheduled',
+        'new' => 'new',
+        'scheduled' => 'scheduled',
     ];
     public const string REVIEW_TYPE = 'przegląd';
     public const array FAILURE_PRIORITY_STATUS = [
-        'new',
-        'deadline',
+        'new' => 'new',
+        'deadline' => 'deadline',
     ];
     public const array FAILURE_PRIORITY_TYPE = [
         'critical' => 'bardzo pilne',
@@ -32,7 +32,7 @@ class MessageService
         private readonly EntityFactory $entityFactory,
         private EntityManagerInterface $entityManager,
         private PhoneNumberUtil        $phoneNumberUtil,
-        private Logger $logger
+        private LoggerInterface $logger
     ) {
     }
 
@@ -81,10 +81,10 @@ class MessageService
     private function processReviewMessage(Review $message, array $content)
     {
         // Set message date.
-        if (!empty($date = $content['dueDate'])) {
-            $date = $this->massageDate($date);
+        $date = $this->massageDate($content['dueDate']);
+        if ($date !== false) {
             $message->setReviewDate($date);
-            $message->setWeekOfYear(\DateTime::createFromFormat('W', $date));
+            $message->setWeekOfYear(\DateTime::createFromFormat('W', $date->getTimestamp()));
             $message->setStatus(self::REVIEW_STATUS['scheduled']);
         } else {
             $message->setStatus(self::REVIEW_STATUS['new']);
@@ -94,14 +94,16 @@ class MessageService
     private function processFailureReportMessage(FailureReport $message, array $content)
     {
         // Set message date.
-        if (!empty($date = $content['dueDate'])) {
-            $date = $this->massageDate($date);
+        // Set message date.
+        $date = $this->massageDate($content['dueDate']);
+        if ($date !== false) {
             $message->setDateOfServiceVisit($date);
             $message->setDateOfServiceVisit($date);
             // If we have a date – status deadline, in another case – new.
             $message->setStatus(self::FAILURE_PRIORITY_STATUS['deadline']);
+        } else {
+            $message->setStatus(self::FAILURE_PRIORITY_STATUS['new']);
         }
-        $message->setStatus(self::FAILURE_PRIORITY_STATUS['new']);
 
         // Set priority for a message by description field.
         $this->setPriorityByDescription($message, $content['description']);
