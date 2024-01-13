@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Service\MessageService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -19,7 +20,7 @@ use Symfony\Component\HttpKernel\Log\Logger;
 )]
 class ImportMessagesCommand extends Command
 {
-    public function __construct(private Filesystem $fileSystem, private Logger $logger)
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private Logger $logger)
     {
         parent::__construct();
     }
@@ -69,8 +70,13 @@ class ImportMessagesCommand extends Command
                 'file_format' => 'json',
             ]);
 
-            foreach ($decodedMessages as $message) {
+            $reviews = [];
+            $failureReports = [];
+            $duplicates = [];
+            $errors = [];
 
+            foreach ($decodedMessages as $message) {
+                $messageEntity = $this->messageService->createMessage($message);
             }
 
         } catch (JsonException $e) {
