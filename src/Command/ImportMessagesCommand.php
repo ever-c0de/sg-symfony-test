@@ -62,6 +62,7 @@ class ImportMessagesCommand extends Command
             ]);
         }
 
+        // Decode the message from JSON format.
         try {
             $decodedMessages = json_decode($encodedMessages, true, 512, JSON_THROW_ON_ERROR);
             $this->logger->info('Started import of messages from source.', [
@@ -77,6 +78,14 @@ class ImportMessagesCommand extends Command
 
             foreach ($decodedMessages as $message) {
                 $messageEntity = $this->messageService->createMessage($message);
+
+                // Check if duplicate.
+                if (is_string($messageEntity)) {
+                    match ($messageEntity) {
+                        'duplicate' => $duplicates[$message['number']],
+                        'error' => $errors[$message['number']],
+                    };
+                }
             }
 
         } catch (JsonException $e) {

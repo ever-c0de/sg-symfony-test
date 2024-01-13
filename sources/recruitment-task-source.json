@@ -1,0 +1,122 @@
+[
+   {
+      "number":1,
+      "description":"Awaria klimatyzacji. Na salonie temperatura wzrosła do 27 stopni. Pozdrawiam Ela.",
+      "dueDate":"2020-01-04 13:30:00",
+      "phone":""
+   },
+   {
+      "number":2,
+      "description":"Prośba o wizytę    ",
+      "dueDate":"2020-01-07 00:30:11",
+      "phone":"\""
+   },
+   {
+      "number":3,
+      "description":"Cieknący kran na zapleczu. Mokre buty!",
+      "dueDate":"2020-02-01 04:32:00",
+      "phone":"4"
+   },
+   {
+      "number":4,
+      "description":" Odpada tynk między szafą, regałem a witryną, proszę o doklejenie go.",
+      "dueDate":"2020-02-03 15:15",
+      "phone":"666-445-127"
+   },
+   {
+      "number":5,
+      "description":"Przegląd zaplanowany na luty. Prosze spojrzeć też do rozdzielni. ",
+      "dueDate":"2020-02-05 00:00",
+      "phone":"888000128"
+   },
+   {
+      "number":6,
+      "description":"Witam dzień dobry, mam sprawę, zgłaszałam ostatnio awarię, ale teraz chciała bym przegląd, proszę przyjechać przeglądnąć klimakonwektory.",
+      "dueDate":"",
+      "phone":"668-221-777"
+   },
+   {
+      "number":7,
+      "description":"Awaria! Awaria pompy głębinowej w na basenie dla gości VIP. Nie ma czasu proszę w tej chwili przyjechać.",
+      "dueDate":"",
+      "phone":"668-221-777"
+   },
+   {
+      "number":8,
+      "description":"Proszę przyjechać na przegląd instalacji elektrycznej dnia 15 lutego.",
+      "dueDate":"2020-02-15",
+      "phone":"+48606303404"
+   },
+   {
+      "number":9,
+      "description":"Klima nie chłodzi, tylko grzeje, nie jestem z tego powodu zadowolona.",
+      "dueDate":null,
+      "phone":""
+   },
+   {
+      "number":10,
+      "description":"Czy Panowie mogą zjawić się na ponowny przegląd rur kanalizacyjnych? Mamy tu mały problem z zapachem.",
+      "dueDate":"2020-02-22",
+      "phone":"+48701145976"
+   },
+   {
+      "number":11,
+      "description":"Prośba o wizytę    ",
+      "dueDate":"2020-02-23",
+      "phone":""
+   },
+   {
+      "number":12,
+      "description":"Bardzo pilne. Proszę o interwencję serwisu, chłodziarki w dziale mięso działają jak chcą, tzn. działają albo nie działają.",
+      "dueDate":"2020-03-01",
+      "phone":"876123567"
+   },
+   {
+      "number":13,
+      "description":"Sprawa jest dosć pilna ponieważ mamy wyciek wody lodowej przy samym suficie, w rogu. Proszę o wizytę!",
+      "dueDate":"2020-03-02",
+      "phone":"873322976"
+   },
+   {
+      "number":14,
+      "description":"Awaria kotła w głownym pomieszczeniu magazynowym.",
+      "dueDate":"",
+      "phone":""
+   },
+   {
+      "number":15,
+      "description":"Krajalnice mięso. Nie działa tarczka głównej maszyny bardzo pilne.",
+      "dueDate":"",
+      "phone":"888241636"
+   },
+   {
+      "number":16,
+      "description":"Awaria kotła w głownym pomieszczeniu magazynowym.",
+      "dueDate":"",
+      "phone":""
+   },
+   {
+      "number":17,
+      "description":"Mam na panów złą wiadomość. Zapraszam na ponowny przegląd maty zabezpieczającej w meblu kasowym. Ostatnio był a sprzęt niestety nie działa, pilne!",
+      "dueDate":"2020-03-02 00:00:00",
+      "phone":"+48505167301"
+   },
+   {
+      "number":18,
+      "description":"Myślę że już czas pomyśleć o ponownym przeglądzie klimatyzacji na sali sprzedaży.Bardzo pilne to nie jest ale, POTRZEBNE!",
+      "dueDate":"",
+      "phone":"506 482 179"
+   },
+   {
+      "number":19,
+      "description":"Brak internetu w pomieszczeniu pracowniczym, nie wiem może ktoś urwał od internetu kabel.",
+      "dueDate":"",
+      "phone":null
+   },
+   {
+      "number":20,
+      "description":"pRosimy o natychmiastoO0wy Przgląd wuzków widłowych, wydaje sie ze cos z nNIch wYCIEKa",
+      "dueDate":"2020-04-01",
+      "phone":"567-124-572"
+   }
+]
