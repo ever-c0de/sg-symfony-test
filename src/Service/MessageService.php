@@ -19,7 +19,6 @@ class MessageService
 
     public function __construct(
         private readonly EntityFactory $entityFactory,
-        private Filesystem             $filesystem,
         private PhoneNumberUtil        $phoneNumberUtil
     ) {
     }
@@ -27,7 +26,6 @@ class MessageService
     public function createMessage($rawMessage)
     {
         $messageEntity = $this->getMessageType($rawMessage['description']);
-
     }
 
     private function processMessage()
@@ -37,7 +35,7 @@ class MessageService
 
     private function getMessageType($description): Review | FailureReport
     {
-        return str_contains($description, self::REVIEW_TYPE) ?
-            $this->entityFactory->createReview() : $this->entityFactory->createFailureReport();
+        return str_contains($description, self::REVIEW_TYPE)
+            ? $this->entityFactory->createReview() : $this->entityFactory->createFailureReport();
     }
 }
