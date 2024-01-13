@@ -23,9 +23,7 @@ class ImportMessagesCommand extends Command
 
     protected function configure(): void
     {
-        $this
-            ->addArgument('filePath', InputArgument::REQUIRED, 'Path of the source file')
-        ;
+        $this->addArgument('filePath', InputArgument::REQUIRED, 'Path of the source file');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
