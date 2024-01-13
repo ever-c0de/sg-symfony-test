@@ -25,6 +25,7 @@
 docs/
 public/bundles/
 tests/
+.idea/
 var/
 vendor/
 .editorconfig
