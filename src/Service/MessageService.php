@@ -38,7 +38,7 @@ class MessageService
 
     public function createMessage($rawMessage)
     {
-        // Get message entity of needed type.
+        // Get message entity of a needed type.
         $messageEntity = $this->getMessageTypeByDescription($rawMessage['description']);
 
         // Check if it is a duplicate.
@@ -98,12 +98,12 @@ class MessageService
             $date = $this->massageDate($date);
             $message->setDateOfServiceVisit($date);
             $message->setDateOfServiceVisit($date);
-            // If we have a date – status deadline. In other case – new.
+            // If we have a date – status deadline, in another case – new.
             $message->setStatus(self::FAILURE_PRIORITY_STATUS['deadline']);
         }
         $message->setStatus(self::FAILURE_PRIORITY_STATUS['new']);
 
-        // Set priority for message by description field.
+        // Set priority for a message by description field.
         $this->setPriorityByDescription($message, $content['description']);
 
     }

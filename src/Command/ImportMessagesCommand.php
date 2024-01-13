@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Service\MessageService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -10,6 +11,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
+use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
 use Symfony\Component\HttpKernel\Log\Logger;
 
@@ -20,7 +23,7 @@ use Symfony\Component\HttpKernel\Log\Logger;
 )]
 class ImportMessagesCommand extends Command
 {
-    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private Logger $logger)
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private Logger $logger)
     {
         parent::__construct();
     }
@@ -43,7 +46,7 @@ class ImportMessagesCommand extends Command
             'filePath' => $filePath,
         ]);
 
-        // Check if source file exist.
+        // Check if the source file exists.
         if (!$this->checkFileExist($filePath)) {
             $io->error(sprintf('Provided filepath to the source is invalid: %s.', $filePath));
             $this->logger->warning('Provided filepath to the source is invalid.', [
@@ -53,7 +56,7 @@ class ImportMessagesCommand extends Command
             return Command::INVALID;
         }
 
-        // Check if source file readable.
+        // Check if the source file readable.
         if (!($encodedMessages = file_get_contents($filePath)) && json_validate($encodedMessages)) {
             $io->error(sprintf('Cannot read contents of source file or JSON is incorrect: %s', $filePath));
             $this->logger->warning('File is empty or invalidate JSON on import.', [
@@ -87,7 +90,6 @@ class ImportMessagesCommand extends Command
                     };
                 }
             }
-
         } catch (JsonException $e) {
             $io->error(sprintf('JSON is broken in file: %s', $filePath));
             $this->logger->warning('JSON file decoding failed.', [
@@ -97,17 +99,35 @@ class ImportMessagesCommand extends Command
             ]);
         }
 
-        $io->success(sprintf('Your entities is ready! You can check the results folder in: %s.', 'results/files'));
+        // Generate result files with entities.
+        $classes = $this->getAvailableEntityMessagesTypes();
+        foreach ($classes as $className) {
+            $classEntities = $this->entityManager->getRepository($className)->findAll();
+            if (!empty($classEntities)) {
+                try {
+                    $json = json_encode($classEntities, JSON_THROW_ON_ERROR);
+                } catch (JsonException $e) {
+                    $this->logger->error('Error while encoding {class} class entities.', [
+                        'class' => $className,
+                        'exception' => $e,
+                    ]);
+                }
+                $date = new \DateTime();
+                $fileName = $className . 's_' . \DateTime::createFromFormat('d_m_Y_H_i_s', $date->getTimestamp());
+                $this->fileSystem->mkdir(__DIR__ . '../../results');
+            }
+        }
 
-        $this->logger->info('Finished messages import. New imported: {importedCount}. Duplicates: {duplicatesCount}. Errors: {errorsCount}.', [
+        $this->logger->notice('Successfully imported {importedMessages} message(s). Duplicate(s): {duplicates}. Error(s): {errors}', [
             'command' => $this->getName(),
-            'filePath' => $filePath,
-            'importedCount' => 1,
-            'duplicatesCount' => 1,
-            'errorsCount' => 1,
-            'resultFiles' => ['/first', '/second']
+            'importedMessages'=> count($decodedMessages) - count($duplicates) - count($errors),
+            'duplicates' => count($duplicates),
+            'errors' => count($errors),
+            'resultFiles' => ['/first', '/second'],
+            'sourceFilePath' => $filePath,
         ]);
 
+        $io->success(sprintf('Your entities is ready! You can check the results folder in: %s.', 'results/files'));
 
         return Command::SUCCESS;
     }
@@ -116,10 +136,44 @@ class ImportMessagesCommand extends Command
      *  Helper method, which check if file exists.
      *
      * @param string $filePath path of the file to check
-     * @return bool if file exist
+     * @return bool if file exists
      */
-    protected function checkFileExist(string $filePath): bool
+    private function checkFileExist(string $filePath): bool
     {
         return $this->fileSystem->exists($filePath);
+    }
+
+    private function getAvailableEntityMessagesTypes()
+    {
+        $classNames = [];
+        // Path to the folder where classes located.
+        $directoryPath = __DIR__ . '/Entity/Message';
+
+        // Using Symfony Finder to find classes.
+        $finder = new Finder();
+        $finder->files()->in($directoryPath)->name('*.php');
+
+        foreach ($finder as $file) {
+            // Get the class name from the file.
+            if (!empty($name = $this->getClassNameFromFile($file))) {
+            $classNames[] = $name;
+            }
+        }
+
+        return $classNames;
+    }
+
+    // Helper method to get the class name from a file.
+    private function getClassNameFromFile(SplFileInfo $file): string
+    {
+        // Get the content of the file
+        $fileContent = $file->getContents();
+
+        // Use a regular expression to find the class.
+        $pattern = '/class (\w+).*\{/';
+        preg_match($pattern, $fileContent, $matches);
+
+        // Return the class name (if found).
+        return $matches[1] ?? '';
     }
 }
