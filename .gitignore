@@ -9,4 +9,5 @@
 /vendor/
 /.env
 /.idea/
+/tools/*
 ###< symfony/framework-bundle ###

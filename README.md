@@ -39,6 +39,7 @@ with [FrankenPHP](https://frankenphp.dev) and [Caddy](https://caddyserver.com/) 
 7. [Using a Makefile](docs/makefile.md)
 8. [Troubleshooting](docs/troubleshooting.md)
 9. [Updating the template](docs/updating.md)
+10. [Code standards](docs/standards.md)
 
 ## License
 
