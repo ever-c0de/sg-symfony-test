@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Entity;
+namespace App\Entity\Message;
 
-use App\Repository\FailureReportRepository;
+use App\Repository\Message\ReviewRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: FailureReportRepository::class)]
-class FailureReport
+#[ORM\Entity(repositoryClass: ReviewRepository::class)]
+class Review
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -21,18 +21,18 @@ class FailureReport
     private ?string $type = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
-    private ?\DateTimeInterface $dateOfServiceVisit = null;
+    private ?\DateTimeInterface $reviewDate = null;
 
-    #[ORM\Column(length: 50)]
-    private ?string $priority = null;
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $weekOfYear = null;
 
     #[ORM\Column(length: 25)]
     private ?string $status = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $serviceComments = null;
+    #[ORM\Column(length: 25)]
+    private ?string $nextServiceAdvice = null;
 
-    #[ORM\Column(length: 20, nullable: true)]
+    #[ORM\Column(type: 'phone_number', nullable: true)]
     private ?string $clientPhone = null;
 
     #[ORM\Column]
@@ -67,26 +67,26 @@ class FailureReport
         return $this;
     }
 
-    public function getDateOfServiceVisit(): ?\DateTimeInterface
+    public function getReviewDate(): ?\DateTimeInterface
     {
-        return $this->dateOfServiceVisit;
+        return $this->reviewDate;
     }
 
-    public function setDateOfServiceVisit(?\DateTimeInterface $dateOfServiceVisit): static
+    public function setReviewDate(?\DateTimeInterface $reviewDate): static
     {
-        $this->dateOfServiceVisit = $dateOfServiceVisit;
+        $this->reviewDate = $reviewDate;
 
         return $this;
     }
 
-    public function getPriority(): ?string
+    public function getWeekOfYear(): ?int
     {
-        return $this->priority;
+        return $this->weekOfYear;
     }
 
-    public function setPriority(string $priority): static
+    public function setWeekOfYear(?int $weekOfYear): static
     {
-        $this->priority = $priority;
+        $this->weekOfYear = $weekOfYear;
 
         return $this;
     }
@@ -103,14 +103,14 @@ class FailureReport
         return $this;
     }
 
-    public function getServiceComments(): ?string
+    public function getNextServiceAdvice(): ?string
     {
-        return $this->serviceComments;
+        return $this->nextServiceAdvice;
     }
 
-    public function setServiceComments(?string $serviceComments): static
+    public function setNextServiceAdvice(string $nextServiceAdvice): static
     {
-        $this->serviceComments = $serviceComments;
+        $this->nextServiceAdvice = $nextServiceAdvice;
 
         return $this;
     }
