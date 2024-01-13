@@ -12,10 +12,16 @@ use Symfony\Component\HttpKernel\Log\Logger;
 class MessageService
 {
     private const string DUPLICATE = 'duplicate';
-
     private const string ERROR = 'error';
+    public const array REVIEW_STATUS = [
+        'new',
+        'scheduled',
+    ];
     public const string REVIEW_TYPE = 'przegląd';
-
+    public const array FAILURE_PRIORITY_STATUS = [
+        'new',
+        'deadline',
+    ];
     public const array FAILURE_PRIORITY_TYPE = [
         'critical' => 'bardzo pilne',
         'high' => 'pilne',
@@ -75,23 +81,27 @@ class MessageService
     private function processReviewMessage(Review $message, array $content)
     {
         // Set message date.
-        if (!empty($date = $content['dueDate'])){
+        if (!empty($date = $content['dueDate'])) {
             $date = $this->massageDate($date);
             $message->setReviewDate($date);
             $message->setWeekOfYear(\DateTime::createFromFormat('W', $date));
-            $message->setStatus('scheduled');
+            $message->setStatus(self::REVIEW_STATUS['scheduled']);
         } else {
-            $message->setStatus('new');
+            $message->setStatus(self::REVIEW_STATUS['new']);
         }
     }
 
     private function processFailureReportMessage(FailureReport $message, array $content)
     {
         // Set message date.
-        if (!empty($date = $content['dueDate'])){
+        if (!empty($date = $content['dueDate'])) {
             $date = $this->massageDate($date);
             $message->setDateOfServiceVisit($date);
+            $message->setDateOfServiceVisit($date);
+            // If we have a date – status deadline. In other case – new.
+            $message->setStatus(self::FAILURE_PRIORITY_STATUS['deadline']);
         }
+        $message->setStatus(self::FAILURE_PRIORITY_STATUS['new']);
 
         // Set priority for message by description field.
         $this->setPriorityByDescription($message, $content['description']);
@@ -104,17 +114,14 @@ class MessageService
             ? $this->entityFactory->createReview() : $this->entityFactory->createFailureReport();
     }
 
-    private function setPriorityByDescription(FailureReport $message, $description)
+    private function setPriorityByDescription(FailureReport $message, $description): void
     {
-        $priorityType = self::FAILURE_PRIORITY_TYPE['normal'];
-
         foreach (self::FAILURE_PRIORITY_TYPE as $priority => $needle) {
             if (str_contains($description, $needle)) {
-                $priorityType = $priority;
+                $message->setPriority($priority);
+                return;
             }
         }
-
-        return $message->setPriority($priorityType);
     }
 
     private function isDuplicate($entity, $description): bool
