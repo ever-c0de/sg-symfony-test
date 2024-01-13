@@ -101,6 +101,8 @@ class ImportMessagesCommand extends Command
 
         // Generate result files with entities.
         $classes = $this->getAvailableEntityMessagesTypes();
+        // Create a directory for results.
+        $this->fileSystem->mkdir(__DIR__ . '../../results');
         foreach ($classes as $className) {
             $classEntities = $this->entityManager->getRepository($className)->findAll();
             if (!empty($classEntities)) {
@@ -113,8 +115,10 @@ class ImportMessagesCommand extends Command
                     ]);
                 }
                 $date = new \DateTime();
+                // Create unique filename.
                 $fileName = $className . 's_' . \DateTime::createFromFormat('d_m_Y_H_i_s', $date->getTimestamp());
-                $this->fileSystem->mkdir(__DIR__ . '../../results');
+                // Create a file with results.
+                $this->fileSystem->dumpFile($fileName, $json);
             }
         }
 
