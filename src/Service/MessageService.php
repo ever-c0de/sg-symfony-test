@@ -6,10 +6,12 @@ use App\Entity\Message\FailureReport;
 use App\Entity\Message\Review;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
+use Exception;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumber;
 use libphonenumber\PhoneNumberUtil;
 use Psr\Log\LoggerInterface;
+use stdClass;
 
 class MessageService
 {
@@ -34,11 +36,17 @@ class MessageService
         private readonly EntityFactory $entityFactory,
         private EntityManagerInterface $entityManager,
         private PhoneNumberUtil        $phoneNumberUtil,
-        private LoggerInterface $logger
+        private LoggerInterface        $logger
     ) {
     }
 
-    public function createMessage($rawMessage)
+    /**
+     * Manages the creation of message entities.
+     *
+     * @param array $rawMessage     source info about a message
+     * @return object|array        created the message or error info
+     */
+    public function createMessage(array $rawMessage): array|object
     {
         // We can't proceed with creation without description.
         if (empty($rawMessage['description'])) {
@@ -61,9 +69,14 @@ class MessageService
     }
 
     /**
-     * @throws NumberParseException
+     * Process message entities fields.
+     *
+     * @param FailureReport|Review $message which process
+     * @param array $content                source info about a message
+     * @return FailureReport|Review|array   processed message entity or error
+     * @throws Exception
      */
-    private function processMessage($message, $content): object | array
+    private function processMessage(FailureReport|Review $message, array $content): FailureReport|Review | array
     {
         // The description is always available on this point.
         $message->setDescription($content['description']);
@@ -90,7 +103,15 @@ class MessageService
         return $message;
     }
 
-    private function processReviewMessage(Review $message, array $content)
+    /**
+     * Process Review message entities fields.
+     *
+     * @param Review $message entity
+     * @param array $content  source info about a message
+     * @return void           processed entity
+     * @throws Exception
+     */
+    private function processReviewMessage(Review $message, array $content): void
     {
         // Set message date.
         $date = $this->massageDate($content['dueDate']);
@@ -103,7 +124,15 @@ class MessageService
         }
     }
 
-    private function processFailureReportMessage(FailureReport $message, array $content)
+    /**
+     * Process FailureReport message entities fields.
+     *
+     * @param FailureReport $message entity
+     * @param array $content  source info about a message
+     * @return void           processed entity
+     * @throws Exception
+     */
+    private function processFailureReportMessage(FailureReport $message, array $content): void
     {
         // Set message date.
         $date = $this->massageDate($content['dueDate']);
@@ -120,12 +149,25 @@ class MessageService
 
     }
 
-    private function getMessageTypeByDescription($description): Review | FailureReport
+    /**
+     * Finds a type of given message entity.
+     *
+     * @param string $description   from entity field
+     * @return Review|FailureReport entity with a type
+     */
+    private function getMessageTypeByDescription(string $description): Review | FailureReport
     {
         return str_contains(mb_strtolower($description), self::REVIEW_TYPE)
             ? $this->entityFactory->createReview() : $this->entityFactory->createFailureReport();
     }
 
+    /**
+     * Sets priority by message description.
+     *
+     * @param FailureReport $message entity
+     * @param string $description    from entity field
+     * @return void                  filled entity
+     */
     private function setPriorityByDescription(FailureReport $message, $description): void
     {
         foreach (self::FAILURE_PRIORITY_TYPE as $priority => $needle) {
@@ -136,16 +178,26 @@ class MessageService
         }
     }
 
+    /**
+     * Checks if entity is duplicate by description field.
+     *
+     * @param Review|FailureReport $entity entity
+     * @param string $description          from entity field
+     * @return bool                        is entity duplicate
+     */
     private function isDuplicate($entity, $description): bool
     {
         return (bool) $this->entityManager->getRepository($entity::class)->findBy(['description' => $description]);
     }
 
     /**
+     * Corrects a phone number format.
+     *
+     * @param mixed $phone
+     * @return PhoneNumber|Exception|NumberParseException
      */
-    private function massagePhoneNumber($phone): PhoneNumber | \Exception|NumberParseException
+    private function massagePhoneNumber(mixed $phone): PhoneNumber | Exception|NumberParseException
     {
-        $parsedPhone = null;
         try {
             $parsedPhone = $this->phoneNumberUtil->parse($phone, 'PL');
         } catch (NumberParseException $e) {
@@ -159,7 +211,11 @@ class MessageService
     }
 
     /**
-     * @throws \Exception
+     * Corrects a date format.
+     *
+     * @param mixed $dueDate  from message field
+     * @return DateTime|false in correct date format
+     * @throws Exception
      */
     private function massageDate(mixed $dueDate): DateTime|false
     {
