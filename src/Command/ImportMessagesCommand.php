@@ -16,6 +16,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
 use Symfony\Component\HttpKernel\KernelInterface;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[AsCommand(
     name: 'app:import-messages',
@@ -29,7 +31,7 @@ class ImportMessagesCommand extends Command
       FailureReport::class,
     ];
 
-    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private KernelInterface $kernel,private LoggerInterface $logger)
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private SerializerInterface $serializer, private KernelInterface $kernel,private LoggerInterface $logger)
     {
         parent::__construct();
     }
@@ -95,6 +97,13 @@ class ImportMessagesCommand extends Command
                     };
                     break;
                 }
+                // Serialize all message entities in JSON.
+                if ($messageEntity->getType() instanceof Review) {
+                    $reviews[] = $this->serializeEntity($messageEntity);
+                } elseif ($messageEntity->getType() instanceof FailureReport) {
+                    $failureReports[] = $this->serializeEntity($messageEntity);
+                }
+
                 // Save entities (not yet in a database).
                 $this->entityManager->persist($messageEntity);
             }
@@ -112,33 +121,28 @@ class ImportMessagesCommand extends Command
         // Create a directory for results.
         $resultsDir = $this->kernel->getProjectDir() . '/results';
 
-//        if ($this->fileSystem->exists($resultsDir) === false) {
-            $this->fileSystem->mkdir($resultsDir);
-//        }
+        $this->fileSystem->mkdir($resultsDir);
 
-        foreach (self::MESSAGE_TYPES as $class) {
-            $classEntities = $this->entityManager->getRepository($class)->findAll();
-            $classReflection = new \ReflectionClass($class);
-            $className = $classReflection->getShortName();
-
-            if (!empty($classEntities)) {
-                try {
-                    $json = json_encode($classEntities, JSON_THROW_ON_ERROR);
-                } catch (JsonException $e) {
-                    $this->logger->error('Error while encoding {class} class entities.', [
-                        'class' => $class,
-                        'exception' => $e,
-                    ]);
-                }
-                $date = new \DateTime();
-                $fileShortName = $className . 's_' . $date->format('d_m_Y_H_i_s') . '.json';
-                // Create unique filename.
-                $fileName = $resultsDir .  '/' . $fileShortName;
-                // Create a file with results.
-                $this->fileSystem->touch($fileName);
-                $this->fileSystem->dumpFile($fileName, $json);
-                $resultFiles[] = $fileShortName;
+        // Create a report for Review message type.
+        $classReflection = new \ReflectionClass(Review::class);
+        $className = $classReflection->getShortName();
+        if (!empty($reviews)) {
+            try {
+                $json = json_encode($reviews, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            } catch (JsonException $e) {
+                $this->logger->error('Error while encoding {class} class entities.', [
+                    'class' => $class,
+                    'exception' => $e,
+                ]);
             }
+            $date = new \DateTime();
+            $fileShortName = $className . 's_' . $date->format('d_m_Y_H_i_s') . '.json';
+            // Create unique filename.
+            $fileName = $resultsDir .  '/' . $fileShortName;
+            // Create a file with results.
+            $this->fileSystem->touch($fileName);
+            $this->fileSystem->dumpFile($fileName, $json);
+            $resultFiles[] = $fileShortName;
         }
 
         $this->logger->notice('Successfully imported {importedMessages} message(s). Duplicate(s): {duplicates}. Error(s): {errors}', [
@@ -173,5 +177,13 @@ class ImportMessagesCommand extends Command
     private function checkFileExist(string $filePath): bool
     {
         return $this->fileSystem->exists($filePath);
+    }
+
+    /**
+     * @throws \JsonException
+     */
+    private function serializeEntity($entity)
+    {
+        return json_decode($this->serializer->serialize($entity, JsonEncoder::FORMAT), true, 512, JSON_THROW_ON_ERROR);
     }
 }
