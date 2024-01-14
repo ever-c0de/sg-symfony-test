@@ -31,7 +31,7 @@ class ImportMessagesCommand extends Command
       FailureReport::class,
     ];
 
-    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private SerializerInterface $serializer, private KernelInterface $kernel,private LoggerInterface $logger)
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private SerializerInterface $serializer, private KernelInterface $kernel, private LoggerInterface $logger)
     {
         parent::__construct();
     }
@@ -88,24 +88,33 @@ class ImportMessagesCommand extends Command
             ]);
             foreach ($decodedMessages as $message) {
                 $messageEntity = $this->messageService->createMessage($message);
-
                 // Check if duplicate.
-                if (is_string($messageEntity)) {
-                    match ($messageEntity) {
-                        'duplicate' => $duplicates[] = $message['number'],
-                        'error' => $errors[] = $message['number'],
+                if (is_array($messageEntity)) {
+                    match (key($messageEntity)) {
+                        'duplicate' => [
+                            $message['duplicate'] = $messageEntity['duplicate'],
+                            $duplicates[] = $message
+                        ],
+                        'error' => [
+                        $message['error'] = $messageEntity['error'],
+                        $errors[] = $message,
+                        ],
+                        default => throw new \Exception('Unexpected match value')
                     };
-                    break;
-                }
-                // Serialize all message entities in JSON.
-                if ($messageEntity->getType() instanceof Review) {
-                    $reviews[] = $this->serializeEntity($messageEntity);
-                } elseif ($messageEntity->getType() instanceof FailureReport) {
-                    $failureReports[] = $this->serializeEntity($messageEntity);
+                    continue;
                 }
 
                 // Save entities (not yet in a database).
                 $this->entityManager->persist($messageEntity);
+                // Query added entities.
+                $this->entityManager->flush();
+                // Serialize all message entities in JSON.
+
+                if ($messageEntity instanceof Review) {
+                    $reviews[] = $this->serializeEntity($messageEntity);
+                } elseif ($messageEntity instanceof FailureReport) {
+                    $failureReports[] = $this->serializeEntity($messageEntity);
+                }
             }
         } catch (JsonException $e) {
             $io->error(sprintf('JSON is broken in file: %s', $filePath));
@@ -115,8 +124,6 @@ class ImportMessagesCommand extends Command
                 'exception' => $e
             ]);
         }
-        // Query all added entities.
-        $this->entityManager->flush();
 
         // Create a directory for results.
         $resultsDir = $this->kernel->getProjectDir() . '/results';
@@ -145,6 +152,65 @@ class ImportMessagesCommand extends Command
             $resultFiles[] = $fileShortName;
         }
 
+        $classReflection = new \ReflectionClass(FailureReport::class);
+        $className = $classReflection->getShortName();
+        if (!empty($failureReports)) {
+            try {
+                $json = json_encode($failureReports, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            } catch (JsonException $e) {
+                $this->logger->error('Error while encoding {class} class entities.', [
+                    'class' => $class,
+                    'exception' => $e,
+                ]);
+            }
+            $date = new \DateTime();
+            $fileShortName = $className . 's_' . $date->format('d_m_Y_H_i_s') . '.json';
+            // Create unique filename.
+            $fileName = $resultsDir .  '/' . $fileShortName;
+            // Create a file with results.
+            $this->fileSystem->touch($fileName);
+            $this->fileSystem->dumpFile($fileName, $json);
+            $resultFiles[] = $fileShortName;
+        }
+
+        if (!empty($duplicates)) {
+            try {
+                $json = json_encode($duplicates, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            } catch (JsonException $e) {
+                $this->logger->error('Error while encoding {class} class entities.', [
+                    'class' => $class,
+                    'exception' => $e,
+                ]);
+            }
+            $date = new \DateTime();
+            $fileShortName = 'Duplicates_' . $date->format('d_m_Y_H_i_s') . '.json';
+            // Create unique filename.
+            $fileName = $resultsDir .  '/' . $fileShortName;
+            // Create a file with results.
+            $this->fileSystem->touch($fileName);
+            $this->fileSystem->dumpFile($fileName, $json);
+            $resultFiles[] = $fileShortName;
+        }
+
+        if (!empty($errors)) {
+            try {
+                $json = json_encode($errors, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            } catch (JsonException $e) {
+                $this->logger->error('Error while encoding {class} class entities.', [
+                    'class' => $class,
+                    'exception' => $e,
+                ]);
+            }
+            $date = new \DateTime();
+            $fileShortName = 'Errors_' . $date->format('d_m_Y_H_i_s') . '.json';
+            // Create unique filename.
+            $fileName = $resultsDir .  '/' . $fileShortName;
+            // Create a file with results.
+            $this->fileSystem->touch($fileName);
+            $this->fileSystem->dumpFile($fileName, $json);
+            $resultFiles[] = $fileShortName;
+        }
+
         $this->logger->notice('Successfully imported {importedMessages} message(s). Duplicate(s): {duplicates}. Error(s): {errors}', [
             'command' => $this->getName(),
             'importedMessages' => count($decodedMessages) - count($duplicates) - count($errors),
@@ -154,16 +220,8 @@ class ImportMessagesCommand extends Command
             'sourceFilePath' => $filePath,
         ]);
 
-        $io->success(sprintf('Your entities is ready! You can check the results folder in: %s', $resultsDir));
-        $io->success(sprintf(
-            'Successfully imported %d message(s). Duplicate(s): %d. Error(s): %d. Command: %s. Result Files: %s. Source File Path: %s',
-            count($decodedMessages) - count($duplicates) - count($errors),
-            count($duplicates),
-            count($errors),
-            $this->getName(),
-            implode(', ', $resultFiles),
-            $filePath
-        ));
+        // Generate a message accordingly to import results (without/with errors, duplicates)
+        $this->generateResultMessage($io, $decodedMessages, $reviews, $failureReports, $duplicates, $errors, $resultFiles);
 
         return Command::SUCCESS;
     }
@@ -185,5 +243,74 @@ class ImportMessagesCommand extends Command
     private function serializeEntity($entity)
     {
         return json_decode($this->serializer->serialize($entity, JsonEncoder::FORMAT), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function generateResultMessage($io, $decodedMessages, $reviews, $failureReports, $duplicates, $errors, $resultFiles)
+    {
+        $importedMessages = count($decodedMessages) - count($duplicates) - count($errors);
+
+        // If we don't have new imported items.
+        if (empty($importedMessages)) {
+            $io->success(sprintf(
+                'Total processed messages: %d. Not new messages created. Duplicate(s): %d. Error(s): %d.',
+                count($decodedMessages),
+                count($duplicates),
+                count($errors)
+            ));
+            $this->generateErrorMessage($io, $errors);
+            return;
+        }
+
+        // If imported without errors.
+        if (empty($errors)) {
+            $io->success(sprintf(
+                'Total processed messages: %d. Duplicate(s): %d.',
+                count($decodedMessages),
+                count($duplicates) > 0 ? count($duplicates) : 'none',
+            ));
+            $io->success(sprintf(
+                'Imported %d new message(s). Reviews: %d. Failure Reports: %d.',
+                $importedMessages,
+                count($reviews),
+                count($failureReports),
+            ));
+            // If imported with errors.
+        } else {
+            $io->warning(sprintf(
+                'Total processed messages: %d. Duplicate(s): %d. Error(s): %d.',
+                count($decodedMessages),
+                count($duplicates) > 0 ? count($duplicates) : 'none',
+                count($errors)
+            ));
+            $io->success(sprintf(
+                'Imported %d new message(s). Reviews: %d. Failure Reports: %d.',
+                $importedMessages,
+                count($reviews),
+                count($failureReports),
+            ));
+
+            $this->generateErrorMessage($io, $errors);
+        }
+
+        // If we have result files.
+        if (!empty($resultFiles)) {
+            $io->note(sprintf(
+                'Result Files: %s.',
+                implode(', ', $resultFiles),
+            ));
+        } else {
+            $io->note("Not any result files generated.");
+        }
+    }
+
+    private function generateErrorMessage($io, $errors)
+    {
+        foreach ($errors as $error) {
+            $io->error(sprintf(
+                'Number: %d. Error: %s',
+                $error['number'],
+                $error['error']
+            ));
+        }
     }
 }
