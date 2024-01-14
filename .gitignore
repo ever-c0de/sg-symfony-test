@@ -11,6 +11,7 @@
 /.idea/
 /tools/*
 /results/
+/.php-cs-fixer.cache
 ###< symfony/framework-bundle ###
 
 ###> symfony/phpunit-bridge ###
