@@ -10,4 +10,5 @@
 /.env
 /.idea/
 /tools/*
+/results/
 ###< symfony/framework-bundle ###
