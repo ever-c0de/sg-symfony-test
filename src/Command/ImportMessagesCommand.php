@@ -2,6 +2,8 @@
 
 namespace App\Command;
 
+use App\Entity\Message\FailureReport;
+use App\Entity\Message\Review;
 use App\Service\MessageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -12,9 +14,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Finder\Finder;
-use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
+use Symfony\Component\HttpKernel\KernelInterface;
 
 #[AsCommand(
     name: 'app:import-messages',
@@ -23,7 +24,12 @@ use Symfony\Component\HttpFoundation\Exception\JsonException;
 )]
 class ImportMessagesCommand extends Command
 {
-    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private LoggerInterface $logger)
+    private const array MESSAGE_TYPES = [
+      Review::class,
+      FailureReport::class,
+    ];
+
+    public function __construct(private Filesystem $fileSystem, private MessageService $messageService, private EntityManagerInterface $entityManager, private KernelInterface $kernel,private LoggerInterface $logger)
     {
         parent::__construct();
     }
@@ -65,6 +71,11 @@ class ImportMessagesCommand extends Command
             ]);
         }
 
+        $resultFiles = [];
+        $reviews = [];
+        $failureReports = [];
+        $duplicates = [];
+        $errors = [];
         // Decode the message from JSON format.
         try {
             $decodedMessages = json_decode($encodedMessages, true, 512, JSON_THROW_ON_ERROR);
@@ -73,22 +84,19 @@ class ImportMessagesCommand extends Command
                 'filePath' => $filePath,
                 'file_format' => 'json',
             ]);
-
-            $reviews = [];
-            $failureReports = [];
-            $duplicates = [];
-            $errors = [];
-
             foreach ($decodedMessages as $message) {
                 $messageEntity = $this->messageService->createMessage($message);
 
                 // Check if duplicate.
                 if (is_string($messageEntity)) {
                     match ($messageEntity) {
-                        'duplicate' => $duplicates[$message['number']],
-                        'error' => $errors[$message['number']],
+                        'duplicate' => $duplicates[] = $message['number'],
+                        'error' => $errors[] = $message['number'],
                     };
+                    break;
                 }
+                // Save entities (not yet in a database).
+                $this->entityManager->persist($messageEntity);
             }
         } catch (JsonException $e) {
             $io->error(sprintf('JSON is broken in file: %s', $filePath));
@@ -98,30 +106,38 @@ class ImportMessagesCommand extends Command
                 'exception' => $e
             ]);
         }
+        // Query all added entities.
+        $this->entityManager->flush();
 
-        // Generate result files with entities.
-        $classes = $this->getAvailableEntityMessagesTypes();
         // Create a directory for results.
-        if ($this->fileSystem->exists(__DIR__ . '../../../results') !== false) {
-            $this->fileSystem->mkdir(__DIR__ . '../../../results');
-        }
-        foreach ($classes as $className) {
-            $classEntities = $this->entityManager->getRepository($className)->findAll();
+        $resultsDir = $this->kernel->getProjectDir() . '/results';
+
+//        if ($this->fileSystem->exists($resultsDir) === false) {
+            $this->fileSystem->mkdir($resultsDir);
+//        }
+
+        foreach (self::MESSAGE_TYPES as $class) {
+            $classEntities = $this->entityManager->getRepository($class)->findAll();
+            $classReflection = new \ReflectionClass($class);
+            $className = $classReflection->getShortName();
+
             if (!empty($classEntities)) {
                 try {
                     $json = json_encode($classEntities, JSON_THROW_ON_ERROR);
-                    $io->success(sprintf('Your entities is ready! JSON: %s.', (string) $json));
                 } catch (JsonException $e) {
                     $this->logger->error('Error while encoding {class} class entities.', [
-                        'class' => $className,
+                        'class' => $class,
                         'exception' => $e,
                     ]);
                 }
                 $date = new \DateTime();
+                $fileShortName = $className . 's_' . $date->format('d_m_Y_H_i_s') . '.json';
                 // Create unique filename.
-                $fileName = $className . 's_' . \DateTime::createFromFormat('d_m_Y_H_i_s', $date->getTimestamp());
+                $fileName = $resultsDir .  '/' . $fileShortName;
                 // Create a file with results.
+                $this->fileSystem->touch($fileName);
                 $this->fileSystem->dumpFile($fileName, $json);
+                $resultFiles[] = $fileShortName;
             }
         }
 
@@ -134,7 +150,16 @@ class ImportMessagesCommand extends Command
             'sourceFilePath' => $filePath,
         ]);
 
-        $io->success(sprintf('Your entities is ready! You can check the results folder in: %s.', 'results/files'));
+        $io->success(sprintf('Your entities is ready! You can check the results folder in: %s', $resultsDir));
+        $io->success(sprintf(
+            'Successfully imported %d message(s). Duplicate(s): %d. Error(s): %d. Command: %s. Result Files: %s. Source File Path: %s',
+            count($decodedMessages) - count($duplicates) - count($errors),
+            count($duplicates),
+            count($errors),
+            $this->getName(),
+            implode(', ', $resultFiles),
+            $filePath
+        ));
 
         return Command::SUCCESS;
     }
@@ -148,39 +173,5 @@ class ImportMessagesCommand extends Command
     private function checkFileExist(string $filePath): bool
     {
         return $this->fileSystem->exists($filePath);
-    }
-
-    private function getAvailableEntityMessagesTypes()
-    {
-        $classNames = [];
-        // Path to the folder where classes located.
-        $directoryPath = __DIR__ . '/../Entity/Message';
-
-        // Using Symfony Finder to find classes.
-        $finder = new Finder();
-        $finder->files()->in($directoryPath)->name('*.php');
-
-        foreach ($finder as $file) {
-            // Get the class name from the file.
-            if (!empty($name = $this->getClassNameFromFile($file))) {
-                $classNames[] = $name;
-            }
-        }
-
-        return $classNames;
-    }
-
-    // Helper method to get the class name from a file.
-    private function getClassNameFromFile(SplFileInfo $file): string
-    {
-        // Get the content of the file
-        $fileContent = $file->getContents();
-
-        // Use a regular expression to find the class.
-        $pattern = '/class (\w+).*\{/';
-        preg_match($pattern, $fileContent, $matches);
-
-        // Return the class name (if found).
-        return $matches[1] ?? '';
     }
 }

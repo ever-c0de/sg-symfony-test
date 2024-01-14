@@ -5,10 +5,20 @@ namespace App\Entity\Message;
 use App\Repository\Message\FailureReportRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use libphonenumber\PhoneNumber;
 
 #[ORM\Entity(repositoryClass: FailureReportRepository::class)]
 class FailureReport
 {
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function __construct()
+    {
+        if ($this->getCreatedAt() === null) {
+            $this->setCreatedAt(new \DateTimeImmutable('now'));
+        }
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -18,7 +28,7 @@ class FailureReport
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
-    private ?string $type = null;
+    private ?string $type = 'failureReport';
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $dateOfServiceVisit = null;
@@ -33,7 +43,7 @@ class FailureReport
     private ?string $serviceComments = null;
 
     #[ORM\Column(type: 'phone_number', nullable: true)]
-    private ?string $clientPhone = null;
+    private ?PhoneNumber $clientPhone = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -120,7 +130,7 @@ class FailureReport
         return $this->clientPhone;
     }
 
-    public function setClientPhone(?string $clientPhone): static
+    public function setClientPhone(?PhoneNumber $clientPhone): static
     {
         $this->clientPhone = $clientPhone;
 

@@ -5,10 +5,20 @@ namespace App\Entity\Message;
 use App\Repository\Message\ReviewRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use libphonenumber\PhoneNumber;
 
 #[ORM\Entity(repositoryClass: ReviewRepository::class)]
 class Review
 {
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function __construct()
+    {
+        if ($this->getCreatedAt() === null) {
+            $this->setCreatedAt(new \DateTimeImmutable('now'));
+        }
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -18,7 +28,7 @@ class Review
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
-    private ?string $type = null;
+    private ?string $type = 'review';
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $reviewDate = null;
@@ -29,11 +39,11 @@ class Review
     #[ORM\Column(length: 25)]
     private ?string $status = null;
 
-    #[ORM\Column(length: 25)]
+    #[ORM\Column(length: 25, nullable: true)]
     private ?string $nextServiceAdvice = null;
 
     #[ORM\Column(type: 'phone_number', nullable: true)]
-    private ?string $clientPhone = null;
+    private ?PhoneNumber $clientPhone = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -120,7 +130,7 @@ class Review
         return $this->clientPhone;
     }
 
-    public function setClientPhone(?string $clientPhone): static
+    public function setClientPhone(?PhoneNumber $clientPhone): static
     {
         $this->clientPhone = $clientPhone;
 

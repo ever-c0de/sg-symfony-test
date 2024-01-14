@@ -6,6 +6,7 @@ use App\Entity\Message\FailureReport;
 use App\Entity\Message\Review;
 use Doctrine\ORM\EntityManagerInterface;
 use libphonenumber\NumberParseException;
+use libphonenumber\PhoneNumber;
 use libphonenumber\PhoneNumberUtil;
 use Psr\Log\LoggerInterface;
 
@@ -38,6 +39,11 @@ class MessageService
 
     public function createMessage($rawMessage)
     {
+        // We can't proceed with creation without description.
+        if (empty($rawMessage['description'])) {
+            return self::ERROR;
+        }
+
         // Get message entity of a needed type.
         $messageEntity = $this->getMessageTypeByDescription($rawMessage['description']);
 
@@ -50,9 +56,7 @@ class MessageService
             return self::DUPLICATE;
         }
 
-        $message = $this->processMessage($messageEntity, $rawMessage);
-
-        return $messageEntity;
+        return $this->processMessage($messageEntity, $rawMessage);
     }
 
     /**
@@ -60,6 +64,9 @@ class MessageService
      */
     private function processMessage($message, $content): object
     {
+        // The description is always available on this point.
+        $message->setDescription($content['description']);
+
         // Process Review type message.
         if ($message instanceof Review) {
             $this->processReviewMessage($message, $content);
@@ -98,7 +105,6 @@ class MessageService
         $date = $this->massageDate($content['dueDate']);
         if ($date !== false) {
             $message->setDateOfServiceVisit($date);
-            $message->setDateOfServiceVisit($date);
             // If we have a date – status deadline, in another case – new.
             $message->setStatus(self::FAILURE_PRIORITY_STATUS['deadline']);
         } else {
@@ -119,7 +125,7 @@ class MessageService
     private function setPriorityByDescription(FailureReport $message, $description): void
     {
         foreach (self::FAILURE_PRIORITY_TYPE as $priority => $needle) {
-            if (str_contains($description, $needle)) {
+            if (str_contains(mb_strtolower($description), mb_strtolower($needle))) {
                 $message->setPriority($priority);
                 return;
             }
@@ -132,10 +138,10 @@ class MessageService
     }
 
     /**
-     * @throws NumberParseException
      */
-    private function massagePhoneNumber($phone): string
+    private function massagePhoneNumber($phone): PhoneNumber | null
     {
+        $parsedPhone = null;
         try {
             $parsedPhone = $this->phoneNumberUtil->parse($phone, 'PL');
         } catch (NumberParseException $e) {
@@ -144,7 +150,7 @@ class MessageService
                 'exception' => $e,
             ]);
         }
-        return $parsedPhone->__toString ?? '';
+        return $parsedPhone;
     }
 
     private function massageDate(mixed $dueDate): \DateTime|false
